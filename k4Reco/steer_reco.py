@@ -17,6 +17,7 @@ parser.add_argument("--data", type=str, default="/dataMuC", help="Top-level dire
 parser.add_argument("--compressionLevel", type=int, default=None, help="Set compression level of output")
 parser.add_argument("--skipReco", action="store_true", default=False, help="Skip reconstruction")
 parser.add_argument("--skipTrackerConing", action="store_true", default=False, help="Skip tracker coning")
+parser.add_argument("--ecal3dCalibCSV", type=str, default="", help="Path to ECAL 3D calibration CSV map")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
@@ -706,6 +707,56 @@ MyHcalEndcapSelector.Parameters = {
 }
 
 
+
+ecalBarrelPandoraCollection = "EcalBarrelCollectionSel"
+ecalEndcapPandoraCollection = "EcalEndcapCollectionSel"
+relCaloHitCollections = ["EcalBarrelRelationsSimSel", "EcalEndcapRelationsSimSel", "HcalBarrelRelationsSimSel", "HcalEndcapRelationsSimSel", "RelationMuonHit"]
+
+if the_args.ecal3dCalibCSV:
+    ecalBarrelPandoraCollection = "EcalBarrelCollectionSel3DCalib"
+    ecalEndcapPandoraCollection = "EcalEndcapCollectionSel3DCalib"
+    relCaloHitCollections = []
+
+MyEcalBarrel3DCalib = MarlinProcessorWrapper("MyEcalBarrel3DCalib")
+MyEcalBarrel3DCalib.OutputLevel = INFO
+MyEcalBarrel3DCalib.ProcessorType = "PrePandora3DCalibrationProcessor"
+MyEcalBarrel3DCalib.Parameters = {
+    "InputCollection": ["EcalBarrelCollectionSel"],
+    "OutputCollection": [ecalBarrelPandoraCollection],
+    "CalibrationCsv": [the_args.ecal3dCalibCSV],
+    "NBinsX": ["40"],
+    "NBinsY": ["40"],
+    "NBinsZ": ["80"],
+    "XMin": ["-4000"],
+    "XMax": ["4000"],
+    "YMin": ["-4000"],
+    "YMax": ["4000"],
+    "ZMin": ["-5000"],
+    "ZMax": ["5000"],
+    "MinScale": ["0.5"],
+    "MaxScale": ["2.0"]
+}
+
+MyEcalEndcap3DCalib = MarlinProcessorWrapper("MyEcalEndcap3DCalib")
+MyEcalEndcap3DCalib.OutputLevel = INFO
+MyEcalEndcap3DCalib.ProcessorType = "PrePandora3DCalibrationProcessor"
+MyEcalEndcap3DCalib.Parameters = {
+    "InputCollection": ["EcalEndcapCollectionSel"],
+    "OutputCollection": [ecalEndcapPandoraCollection],
+    "CalibrationCsv": [the_args.ecal3dCalibCSV],
+    "NBinsX": ["40"],
+    "NBinsY": ["40"],
+    "NBinsZ": ["80"],
+    "XMin": ["-4000"],
+    "XMax": ["4000"],
+    "YMin": ["-4000"],
+    "YMax": ["4000"],
+    "ZMin": ["-5000"],
+    "ZMax": ["5000"],
+    "MinScale": ["0.5"],
+    "MaxScale": ["2.0"]
+}
+
 DDMarlinPandora = MarlinProcessorWrapper("DDMarlinPandora")
 DDMarlinPandora.OutputLevel = INFO
 DDMarlinPandora.ProcessorType = "DDPandoraPFANewProcessor"
@@ -717,7 +768,7 @@ DDMarlinPandora.Parameters = {
     "D0UnmatchedVertexTrackCut": ["5"],
     "DigitalMuonHits": ["0"],
     "ECalBarrelNormalVector": ["0", "0", "1"],
-    "ECalCaloHitCollections": ["EcalBarrelCollectionSel", "EcalEndcapCollectionSel"],
+    "ECalCaloHitCollections": [ecalBarrelPandoraCollection, ecalEndcapPandoraCollection],
     "ECalMipThreshold": ["0.5"],
     "ECalScMipThreshold": ["0"],
     "ECalScToEMGeVCalibration": ["1"],
@@ -784,7 +835,7 @@ DDMarlinPandora.Parameters = {
     "ReachesECalMinFtdLayer": ["0"],
     "ReachesECalNBarrelTrackerHits": ["0"],
     "ReachesECalNFtdHits": ["0"],
-    "RelCaloHitCollections": ["EcalBarrelRelationsSimSel", "EcalEndcapRelationsSimSel", "HcalBarrelRelationsSimSel", "HcalEndcapRelationsSimSel", "RelationMuonHit"],
+    "RelCaloHitCollections": relCaloHitCollections,
     "RelTrackCollections": ["SelectedTracks_Relation"],
     "ShouldFormTrackRelationships": ["1"],
     "SoftwareCompensationEnergyDensityBins": ["0", "2.", "5.", "7.5", "9.5", "13.", "16.", "20.", "23.5", "28.", "33.", "40.", "50.", "75.", "100."],
@@ -1029,6 +1080,9 @@ if not the_args.skipReco:
     algList.append(Refit)
     algList.append(MyTrackSelector)
     algList.append(MyTrackTruthSelected)
+    if the_args.ecal3dCalibCSV:
+        algList.append(MyEcalBarrel3DCalib)
+        algList.append(MyEcalEndcap3DCalib)
     algList.append(DDMarlinPandora)
     algList.append(FastJetProcessor)
     algList.append(ValenciaJetProcessor)
