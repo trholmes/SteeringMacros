@@ -18,6 +18,7 @@ parser.add_argument("--compressionLevel", type=int, default=None, help="Set comp
 parser.add_argument("--skipReco", action="store_true", default=False, help="Skip reconstruction")
 parser.add_argument("--skipTrackerConing", action="store_true", default=False, help="Skip tracker coning")
 parser.add_argument("--ecal3dCalibCSV", type=str, default="", help="Path to ECAL 3D calibration CSV map")
+parser.add_argument("--pfoThetaEnergyCalibCSV", type=str, default="", help="Path to PFO theta-energy 2D calibration CSV map")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
@@ -887,6 +888,22 @@ DDMarlinPandora.Parameters = {
     "ZCutForNonVertexTracks": ["250"]
 }
 
+pfoCollectionForJets = "PandoraPFOs"
+if the_args.pfoThetaEnergyCalibCSV:
+    pfoCollectionForJets = "PandoraPFOsThetaECalib"
+
+PfoThetaEnergyCalib = MarlinProcessorWrapper("PfoThetaEnergyCalib")
+PfoThetaEnergyCalib.OutputLevel = INFO
+PfoThetaEnergyCalib.ProcessorType = "PfoThetaEnergyCalibrationProcessor"
+PfoThetaEnergyCalib.Parameters = {
+    "InputCollection": ["PandoraPFOs"],
+    "OutputCollection": [pfoCollectionForJets],
+    "CalibrationCsv": [the_args.pfoThetaEnergyCalibCSV],
+    "DefaultScale": ["1.0"],
+    "MinScale": ["0.5"],
+    "MaxScale": ["2.0"]
+}
+
 FastJetProcessor = MarlinProcessorWrapper("FastJetProcessor")
 FastJetProcessor.OutputLevel = INFO
 FastJetProcessor.ProcessorType = "FastJetProcessor"
@@ -894,7 +911,7 @@ FastJetProcessor.Parameters = {
     "algorithm": ["antikt_algorithm", "0.4"],
     "clusteringMode": ["Inclusive", "5"],
     "jetOut": ["JetOut"],
-    "recParticleIn": ["PandoraPFOs"],
+    "recParticleIn": [pfoCollectionForJets],
     "recombinationScheme": ["E_scheme"]
 }
 
@@ -905,7 +922,7 @@ ValenciaJetProcessor.Parameters = {
     "algorithm": ["ValenciaPlugin", "1.2", "1.0", "0.7"],
     "clusteringMode": ["ExclusiveNJets", "2"],
     "jetOut": ["ValenciaJetOut"],
-    "recParticleIn": ["PandoraPFOs"],
+    "recParticleIn": [pfoCollectionForJets],
     "recombinationScheme": ["E_scheme"]
 }
 
@@ -915,7 +932,7 @@ TrueMCintoRecoForJets.ProcessorType = "TrueMCintoRecoForJets"
 TrueMCintoRecoForJets.Parameters = {
                                       "MCParticleInputCollectionName": ["MCParticle"],
                                       "RECOParticleCollectionName": ["MCParticlePandoraPFOs"],
-                                      "RecoParticleInputCollectionName": ["PandoraPFOs"],
+                                      "RecoParticleInputCollectionName": [pfoCollectionForJets],
                                       "RecoParticleNoLeptonCollectionName": ["PandoraPFOsNoLeptons"],
                                       "cosAngle_pfo_lepton": ["0.995"],
                                       "ignoreNeutrinosInMCJets": ["true"],
@@ -1084,6 +1101,8 @@ if not the_args.skipReco:
         algList.append(MyEcalBarrel3DCalib)
         algList.append(MyEcalEndcap3DCalib)
     algList.append(DDMarlinPandora)
+    if the_args.pfoThetaEnergyCalibCSV:
+        algList.append(PfoThetaEnergyCalib)
     algList.append(FastJetProcessor)
     algList.append(ValenciaJetProcessor)
     algList.append(TrueMCintoRecoForJets)
