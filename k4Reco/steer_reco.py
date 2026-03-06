@@ -5,6 +5,7 @@ from Configurables import LcioEvent, EventDataSvc, MarlinProcessorWrapper
 from k4MarlinWrapper.parseConstants import *
 
 import os
+import json
 
 from k4FWCore.parseArgs import parser
 
@@ -18,6 +19,7 @@ parser.add_argument("--compressionLevel", type=int, default=None, help="Set comp
 parser.add_argument("--skipReco", action="store_true", default=False, help="Skip reconstruction")
 parser.add_argument("--skipTrackerConing", action="store_true", default=False, help="Skip tracker coning")
 parser.add_argument("--ecal3dCalibCSV", type=str, default="", help="Path to ECAL 3D calibration CSV map")
+parser.add_argument("--thetaEnergyCalibPayload", type=str, default="", help="Path to JSON payload for DDMarlinPandora theta-energy calibration parameters")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
@@ -886,6 +888,17 @@ DDMarlinPandora.Parameters = {
     "Z0UnmatchedVertexTrackCut": ["5"],
     "ZCutForNonVertexTracks": ["250"]
 }
+
+if the_args.thetaEnergyCalibPayload:
+    with open(the_args.thetaEnergyCalibPayload, "r", encoding="utf-8") as f:
+        theta_energy_payload = json.load(f)
+    if not isinstance(theta_energy_payload, dict):
+        raise RuntimeError("thetaEnergyCalibPayload must be a JSON object of DDMarlinPandora parameter keys.")
+    for key, value in theta_energy_payload.items():
+        if not isinstance(value, list):
+            raise RuntimeError(f"thetaEnergyCalibPayload value for '{key}' must be a list.")
+        DDMarlinPandora.Parameters[key] = [str(x) for x in value]
+    print(f"Loaded theta-energy calibration payload with {len(theta_energy_payload)} keys from {the_args.thetaEnergyCalibPayload}")
 
 FastJetProcessor = MarlinProcessorWrapper("FastJetProcessor")
 FastJetProcessor.OutputLevel = INFO
