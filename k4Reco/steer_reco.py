@@ -42,10 +42,10 @@ marlin_dll_entries = [x for x in os.environ["MARLIN_DLL"].split(":") if x]
 if not the_args.disableAutoMyBIBUtilsDll:
     mybib_candidates = []
     for pattern in (
-        f"{the_args.code}/MyBIBUtils/lib/*.so",
-        f"{the_args.code}/MyBIBUtils/build/lib/*.so",
-        f"{the_args.code}/MyBIBUtils/lib64/*.so",
-        f"{the_args.code}/MyBIBUtils/build/lib64/*.so",
+        f"{the_args.code}/MyBIBUtils/lib/libMyBIBUtils*.so",
+        f"{the_args.code}/MyBIBUtils/build/lib/libMyBIBUtils*.so",
+        f"{the_args.code}/MyBIBUtils/lib64/libMyBIBUtils*.so",
+        f"{the_args.code}/MyBIBUtils/build/lib64/libMyBIBUtils*.so",
     ):
         mybib_candidates.extend(glob.glob(pattern))
     for lib in sorted(set(mybib_candidates)):
