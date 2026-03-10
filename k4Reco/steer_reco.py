@@ -7,6 +7,7 @@ from k4MarlinWrapper.parseConstants import *
 import os
 import json
 import glob
+import tempfile
 
 from k4FWCore.parseArgs import parser
 
@@ -59,6 +60,24 @@ if the_args.extraMarlinDll:
 
 os.environ["MARLIN_DLL"] = ":".join(marlin_dll_entries)
 print(f"MARLIN_DLL entries after steering setup: {len(marlin_dll_entries)}")
+
+# Patch hardcoded /code paths in Pandora settings XML to the runtime --code path.
+pandora_settings_xml = f"{the_args.code}/SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml"
+if os.path.isfile(pandora_settings_xml):
+    with open(pandora_settings_xml, "r", encoding="utf-8") as f:
+        pandora_xml_text = f.read()
+    code_prefix = f"{the_args.code.rstrip('/')}/"
+    patched_xml_text = pandora_xml_text.replace("/code/", code_prefix)
+    if patched_xml_text != pandora_xml_text:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix="_PandoraSettingsPatched.xml",
+            prefix="steer_reco_",
+            delete=False,
+        ) as tf:
+            tf.write(patched_xml_text)
+            pandora_settings_xml = tf.name
+        print(f"Using patched Pandora settings XML: {pandora_settings_xml}")
 
 algList = []
 evtsvc = EventDataSvc()
@@ -865,7 +884,7 @@ DDMarlinPandora.Parameters = {
     "NEventsToSkip": ["0"],
     "NOuterSamplingLayers": ["3"],
     "PFOCollectionName": ["PandoraPFOs"],
-    "PandoraSettingsXmlFile": [f"{the_args.code}/SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml"],
+    "PandoraSettingsXmlFile": [pandora_settings_xml],
     "ProngVertexCollections": ["ProngVertices"],
     "ReachesECalBarrelTrackerOuterDistance": ["-100"],
     "ReachesECalBarrelTrackerZMaxDistance": ["-50"],
