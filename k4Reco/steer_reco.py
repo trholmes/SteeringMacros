@@ -20,6 +20,7 @@ parser.add_argument("--data", type=str, default="/dataMuC", help="Top-level dire
 parser.add_argument("--compressionLevel", type=int, default=None, help="Set compression level of output")
 parser.add_argument("--skipReco", action="store_true", default=False, help="Skip reconstruction")
 parser.add_argument("--skipTrackerConing", action="store_true", default=False, help="Skip tracker coning")
+parser.add_argument("--disableAIDA", action="store_true", default=False, help="Disable AIDAProcessor (workaround for occasional teardown crashes)")
 parser.add_argument("--ecal3dCalibCSV", type=str, default="", help="Path to ECAL 3D calibration CSV map")
 parser.add_argument("--thetaEnergyCalibPayload", type=str, default="", help="Path to JSON payload for DDMarlinPandora theta-energy calibration parameters")
 parser.add_argument("--extraMarlinDll", type=str, default="", help="Colon-separated extra processor libraries to prepend to MARLIN_DLL")
@@ -1135,7 +1136,8 @@ OverlayIP.Parameters = {
     "TPCDriftvelocity": ["0.05"]
 }
 
-algList.append(MyAIDAProcessor)
+if not the_args.disableAIDA:
+    algList.append(MyAIDAProcessor)
 algList.append(EventNumber)
 algList.append(InitDD4hep)
 if the_args.enableBIB:
