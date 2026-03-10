@@ -24,6 +24,12 @@ the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
 
+# Some environments provide MARLIN_DLL with empty path entries (e.g. trailing ':'),
+# which makes MyAIDAProcessor try to load an empty library name.
+if "MARLIN_DLL" in os.environ:
+    marlin_dll_entries = [x for x in os.environ["MARLIN_DLL"].split(":") if x]
+    os.environ["MARLIN_DLL"] = ":".join(marlin_dll_entries)
+
 algList = []
 evtsvc = EventDataSvc()
 
