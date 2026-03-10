@@ -6,6 +6,7 @@ from k4MarlinWrapper.parseConstants import *
 
 import os
 import json
+import glob
 
 from k4FWCore.parseArgs import parser
 
@@ -20,6 +21,8 @@ parser.add_argument("--skipReco", action="store_true", default=False, help="Skip
 parser.add_argument("--skipTrackerConing", action="store_true", default=False, help="Skip tracker coning")
 parser.add_argument("--ecal3dCalibCSV", type=str, default="", help="Path to ECAL 3D calibration CSV map")
 parser.add_argument("--thetaEnergyCalibPayload", type=str, default="", help="Path to JSON payload for DDMarlinPandora theta-energy calibration parameters")
+parser.add_argument("--extraMarlinDll", type=str, default="", help="Colon-separated extra processor libraries to prepend to MARLIN_DLL")
+parser.add_argument("--disableAutoMyBIBUtilsDll", action="store_true", default=False, help="Disable automatic MyBIBUtils library discovery")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
@@ -29,6 +32,33 @@ Coned = "" if the_args.skipTrackerConing else "Coned"
 if "MARLIN_DLL" in os.environ:
     marlin_dll_entries = [x for x in os.environ["MARLIN_DLL"].split(":") if x]
     os.environ["MARLIN_DLL"] = ":".join(marlin_dll_entries)
+else:
+    os.environ["MARLIN_DLL"] = ""
+
+marlin_dll_entries = [x for x in os.environ["MARLIN_DLL"].split(":") if x]
+
+# Auto-discover likely MyBIBUtils processor libraries unless explicitly disabled
+if not the_args.disableAutoMyBIBUtilsDll:
+    mybib_candidates = []
+    for pattern in (
+        f"{the_args.code}/MyBIBUtils/lib/*.so",
+        f"{the_args.code}/MyBIBUtils/build/lib/*.so",
+        f"{the_args.code}/MyBIBUtils/lib64/*.so",
+        f"{the_args.code}/MyBIBUtils/build/lib64/*.so",
+    ):
+        mybib_candidates.extend(glob.glob(pattern))
+    for lib in sorted(set(mybib_candidates)):
+        if lib not in marlin_dll_entries:
+            marlin_dll_entries.insert(0, lib)
+
+# Allow manual extra libs for nonstandard layouts
+if the_args.extraMarlinDll:
+    for lib in [x for x in the_args.extraMarlinDll.split(":") if x]:
+        if lib not in marlin_dll_entries:
+            marlin_dll_entries.insert(0, lib)
+
+os.environ["MARLIN_DLL"] = ":".join(marlin_dll_entries)
+print(f"MARLIN_DLL entries after steering setup: {len(marlin_dll_entries)}")
 
 algList = []
 evtsvc = EventDataSvc()
