@@ -8,6 +8,7 @@ import os
 import json
 import glob
 import tempfile
+import re
 
 from k4FWCore.parseArgs import parser
 
@@ -95,6 +96,21 @@ marlin_dll_entries = dedupe_libs(marlin_dll_entries)
 os.environ["MARLIN_DLL"] = ":".join(marlin_dll_entries)
 print(f"MARLIN_DLL entries after steering setup: {len(marlin_dll_entries)}")
 
+theta_energy_payload = None
+theta_energy_plugin_enabled = False
+theta_energy_plugin_name = "ThetaEnergyBinned"
+if the_args.thetaEnergyCalibPayload:
+    with open(the_args.thetaEnergyCalibPayload, "r", encoding="utf-8") as f:
+        theta_energy_payload = json.load(f)
+    if not isinstance(theta_energy_payload, dict):
+        raise RuntimeError("thetaEnergyCalibPayload must be a JSON object of DDMarlinPandora parameter keys.")
+    enabled_value = theta_energy_payload.get("ThetaEnergyCorrectionEnabled", [])
+    if enabled_value:
+        theta_energy_plugin_enabled = str(enabled_value[0]).strip().lower() in ("1", "true", "yes", "on")
+    plugin_value = theta_energy_payload.get("ThetaEnergyCorrectionPluginName", [])
+    if plugin_value:
+        theta_energy_plugin_name = str(plugin_value[0]).strip()
+
 # Patch hardcoded /code paths in Pandora settings XML to the runtime --code path.
 pandora_settings_xml = f"{the_args.code}/SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml"
 if os.path.isfile(pandora_settings_xml):
@@ -102,6 +118,26 @@ if os.path.isfile(pandora_settings_xml):
         pandora_xml_text = f.read()
     code_prefix = f"{the_args.code.rstrip('/')}/"
     patched_xml_text = pandora_xml_text.replace("/code/", code_prefix)
+    if theta_energy_plugin_enabled and theta_energy_plugin_name:
+        pattern = r"(<HadronicEnergyCorrectionPlugins>)([^<]*)(</HadronicEnergyCorrectionPlugins>)"
+        match = re.search(pattern, patched_xml_text)
+        if match:
+            plugin_tokens = [x for x in re.split(r"[,\s]+", match.group(2).strip()) if x]
+            if theta_energy_plugin_name not in plugin_tokens:
+                plugin_tokens.append(theta_energy_plugin_name)
+            new_body = " ".join(plugin_tokens)
+            patched_xml_text = re.sub(
+                pattern,
+                rf"\1{new_body}\3",
+                patched_xml_text,
+                count=1,
+            )
+            print(
+                f"Updated HadronicEnergyCorrectionPlugins in Pandora XML to include: "
+                f"{theta_energy_plugin_name}"
+            )
+        else:
+            print("WARNING: Could not find <HadronicEnergyCorrectionPlugins> in Pandora settings XML.")
     if patched_xml_text != pandora_xml_text:
         with tempfile.NamedTemporaryFile(
             mode="w",
@@ -983,10 +1019,6 @@ if the_args.writeClusterCalibrationComparison:
     DDMarlinPandora.Parameters["UncalibratedClusterCollectionName"] = ["PandoraClusters"]
 
 if the_args.thetaEnergyCalibPayload:
-    with open(the_args.thetaEnergyCalibPayload, "r", encoding="utf-8") as f:
-        theta_energy_payload = json.load(f)
-    if not isinstance(theta_energy_payload, dict):
-        raise RuntimeError("thetaEnergyCalibPayload must be a JSON object of DDMarlinPandora parameter keys.")
     for key, value in theta_energy_payload.items():
         if not isinstance(value, list):
             raise RuntimeError(f"thetaEnergyCalibPayload value for '{key}' must be a list.")
