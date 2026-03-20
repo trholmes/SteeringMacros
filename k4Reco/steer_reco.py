@@ -1017,6 +1017,7 @@ DDMarlinPandora.Parameters = {
 if the_args.writeClusterCalibrationComparison:
     DDMarlinPandora.Parameters["ClusterCollectionName"] = ["PandoraClustersCalibrated"]
     DDMarlinPandora.Parameters["UncalibratedClusterCollectionName"] = ["PandoraClusters"]
+    DDMarlinPandora.Parameters["ForceClusterEnergyComparisonToHadronic"] = ["true"]
 
 if the_args.thetaEnergyCalibPayload:
     for key, value in theta_energy_payload.items():
