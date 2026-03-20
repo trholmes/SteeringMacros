@@ -119,25 +119,64 @@ if os.path.isfile(pandora_settings_xml):
     code_prefix = f"{the_args.code.rstrip('/')}/"
     patched_xml_text = pandora_xml_text.replace("/code/", code_prefix)
     if theta_energy_plugin_enabled and theta_energy_plugin_name:
-        pattern = r"(<HadronicEnergyCorrectionPlugins>)([^<]*)(</HadronicEnergyCorrectionPlugins>)"
-        match = re.search(pattern, patched_xml_text)
-        if match:
-            plugin_tokens = [x for x in re.split(r"[,\s]+", match.group(2).strip()) if x]
-            if theta_energy_plugin_name not in plugin_tokens:
-                plugin_tokens.append(theta_energy_plugin_name)
-            new_body = " ".join(plugin_tokens)
-            patched_xml_text = re.sub(
-                pattern,
-                rf"\1{new_body}\3",
-                patched_xml_text,
-                count=1,
-            )
+        def ensure_energy_plugin(xml_text, tag_name, plugin_name):
+            pattern = rf"(<{tag_name}>)([^<]*)(</{tag_name}>)"
+            match = re.search(pattern, xml_text)
+            if match:
+                plugin_tokens = [x for x in re.split(r"[,\s]+", match.group(2).strip()) if x]
+                if plugin_name not in plugin_tokens:
+                    plugin_tokens.append(plugin_name)
+                new_body = " ".join(plugin_tokens)
+                return re.sub(pattern, rf"\1{new_body}\3", xml_text, count=1), True
+
+            return xml_text, False
+
+        patched_xml_text, hadronic_found = ensure_energy_plugin(
+            patched_xml_text,
+            "HadronicEnergyCorrectionPlugins",
+            theta_energy_plugin_name,
+        )
+        if hadronic_found:
             print(
-                f"Updated HadronicEnergyCorrectionPlugins in Pandora XML to include: "
+                "Updated HadronicEnergyCorrectionPlugins in Pandora XML to include: "
                 f"{theta_energy_plugin_name}"
             )
         else:
             print("WARNING: Could not find <HadronicEnergyCorrectionPlugins> in Pandora settings XML.")
+
+        patched_xml_text, electromagnetic_found = ensure_energy_plugin(
+            patched_xml_text,
+            "ElectromagneticEnergyCorrectionPlugins",
+            theta_energy_plugin_name,
+        )
+        if electromagnetic_found:
+            print(
+                "Updated ElectromagneticEnergyCorrectionPlugins in Pandora XML to include: "
+                f"{theta_energy_plugin_name}"
+            )
+        else:
+            hadronic_line = re.search(
+                r"([ \t]*<HadronicEnergyCorrectionPlugins>[^<]*</HadronicEnergyCorrectionPlugins>\n)",
+                patched_xml_text,
+            )
+            if hadronic_line:
+                insertion = (
+                    f"{hadronic_line.group(1)}"
+                    f"{' ' * (len(hadronic_line.group(1)) - len(hadronic_line.group(1).lstrip()))}"
+                    f"<ElectromagneticEnergyCorrectionPlugins>{theta_energy_plugin_name}"
+                    f"</ElectromagneticEnergyCorrectionPlugins>\n"
+                )
+                patched_xml_text = (
+                    patched_xml_text[: hadronic_line.start(1)]
+                    + insertion
+                    + patched_xml_text[hadronic_line.end(1):]
+                )
+                print(
+                    "Inserted ElectromagneticEnergyCorrectionPlugins in Pandora XML to include: "
+                    f"{theta_energy_plugin_name}"
+                )
+            else:
+                print("WARNING: Could not insert <ElectromagneticEnergyCorrectionPlugins> in Pandora settings XML.")
     if patched_xml_text != pandora_xml_text:
         with tempfile.NamedTemporaryFile(
             mode="w",
