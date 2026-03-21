@@ -8,6 +8,7 @@ import os
 import json
 import re
 import tempfile
+from pathlib import Path
 
 from k4FWCore.parseArgs import parser
 
@@ -21,9 +22,43 @@ parser.add_argument("--compressionLevel", type=int, default=None, help="Set comp
 parser.add_argument("--skipReco", action="store_true", default=False, help="Skip reconstruction")
 parser.add_argument("--skipTrackerConing", action="store_true", default=False, help="Skip tracker coning")
 parser.add_argument("--thetaEnergyCalibPayload", type=str, default=None, help="JSON payload of DDMarlinPandora theta-energy correction parameters")
+parser.add_argument("--detectorXml", type=str, default=None, help="Override DD4hep detector XML file")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
+
+
+def resolve_detector_xml():
+    if the_args.detectorXml:
+        if not os.path.isfile(the_args.detectorXml):
+            raise RuntimeError(f"Requested detector XML does not exist: {the_args.detectorXml}")
+        return the_args.detectorXml
+
+    candidates = [
+        os.path.join(os.environ.get("k4geo_DIR", ""), "MuColl/MAIA/compact/MAIA_v0/MAIA_v0.xml"),
+        os.path.join(the_args.code, "detector-simulation/compact/MAIA_v0/MAIA_v0.xml"),
+        os.path.join(the_args.code, "detector-simulation/compact/MAIA/MAIA_v0.xml"),
+    ]
+
+    for candidate in candidates:
+        if candidate and os.path.isfile(candidate):
+            return candidate
+
+    detector_root = Path(the_args.code) / "detector-simulation"
+    if detector_root.is_dir():
+        matches = sorted(detector_root.rglob("MAIA*.xml"))
+        if matches:
+            return str(matches[0])
+
+    raise RuntimeError(
+        "Could not locate a DD4hep detector XML. "
+        "Tried k4geo and detector-simulation defaults. "
+        "Pass --detectorXml /full/path/to/MAIA*.xml explicitly."
+    )
+
+
+detector_xml = resolve_detector_xml()
+print(f"Using detector XML: {detector_xml}")
 
 theta_energy_payload = None
 hadronic_theta_energy_plugin_enabled = False
@@ -194,7 +229,7 @@ InitDD4hep = MarlinProcessorWrapper("InitDD4hep")
 InitDD4hep.OutputLevel = INFO
 InitDD4hep.ProcessorType = "InitializeDD4hep"
 InitDD4hep.Parameters = {
-    "DD4hepXMLFile": [os.environ['k4geo_DIR']+"/MuColl/MAIA/compact/MAIA_v0/MAIA_v0.xml"],
+    "DD4hepXMLFile": [detector_xml],
     "EncodingStringParameterName": ["GlobalTrackerReadoutID"]
 }
 
