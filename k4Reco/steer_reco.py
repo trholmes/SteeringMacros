@@ -9,6 +9,7 @@ import json
 import re
 import tempfile
 from pathlib import Path
+import glob
 
 from k4FWCore.parseArgs import parser
 
@@ -23,9 +24,68 @@ parser.add_argument("--skipReco", action="store_true", default=False, help="Skip
 parser.add_argument("--skipTrackerConing", action="store_true", default=False, help="Skip tracker coning")
 parser.add_argument("--thetaEnergyCalibPayload", type=str, default=None, help="JSON payload of DDMarlinPandora theta-energy correction parameters")
 parser.add_argument("--detectorXml", type=str, default=None, help="Override DD4hep detector XML file")
+parser.add_argument("--extraMarlinDll", type=str, default="", help="Colon-separated extra processor libraries to prepend to MARLIN_DLL")
+parser.add_argument("--disableAutoMyBIBUtilsDll", action="store_true", default=False, help="Disable automatic MyBIBUtils library discovery")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
+
+
+def dedupe_libs(lib_paths):
+    out = []
+    seen = set()
+    for lib in lib_paths:
+        lib_clean = lib.strip()
+        if not lib_clean:
+            continue
+        key = os.path.realpath(lib_clean)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(lib_clean)
+    return out
+
+
+if "MARLIN_DLL" in os.environ:
+    marlin_dll_entries = [x for x in os.environ["MARLIN_DLL"].split(":") if x]
+else:
+    marlin_dll_entries = []
+
+if not the_args.disableAutoMyBIBUtilsDll:
+    mybib_candidates = []
+    for lib in (
+        f"{the_args.code}/MyBIBUtils/lib/libMyBIBUtils.so",
+        f"{the_args.code}/MyBIBUtils/build/lib/libMyBIBUtils.so",
+        f"{the_args.code}/MyBIBUtils/lib64/libMyBIBUtils.so",
+        f"{the_args.code}/MyBIBUtils/build/lib64/libMyBIBUtils.so",
+    ):
+        if os.path.exists(lib):
+            mybib_candidates.append(lib)
+
+    if not mybib_candidates:
+        for pattern in (
+            f"{the_args.code}/MyBIBUtils/lib/libMyBIBUtils*.so",
+            f"{the_args.code}/MyBIBUtils/build/lib/libMyBIBUtils*.so",
+            f"{the_args.code}/MyBIBUtils/lib64/libMyBIBUtils*.so",
+            f"{the_args.code}/MyBIBUtils/build/lib64/libMyBIBUtils*.so",
+        ):
+            mybib_candidates.extend(glob.glob(pattern))
+        mybib_candidates = sorted(set(mybib_candidates))
+        if len(mybib_candidates) > 1:
+            print(
+                "WARNING: Multiple MyBIBUtils libs detected via wildcard fallback; "
+                "consider --disableAutoMyBIBUtilsDll with --extraMarlinDll."
+            )
+
+    if mybib_candidates:
+        marlin_dll_entries = list(mybib_candidates) + marlin_dll_entries
+
+if the_args.extraMarlinDll:
+    marlin_dll_entries = [x for x in the_args.extraMarlinDll.split(":") if x] + marlin_dll_entries
+
+marlin_dll_entries = dedupe_libs(marlin_dll_entries)
+os.environ["MARLIN_DLL"] = ":".join(marlin_dll_entries)
+print(f"MARLIN_DLL entries after steering setup: {len(marlin_dll_entries)}")
 
 
 def resolve_detector_xml():
