@@ -97,19 +97,46 @@ os.environ["MARLIN_DLL"] = ":".join(marlin_dll_entries)
 print(f"MARLIN_DLL entries after steering setup: {len(marlin_dll_entries)}")
 
 theta_energy_payload = None
-theta_energy_plugin_enabled = False
-theta_energy_plugin_name = "ThetaEnergyBinned"
+hadronic_theta_energy_plugin_enabled = False
+hadronic_theta_energy_plugin_name = "ThetaEnergyBinned"
+electromagnetic_theta_energy_plugin_enabled = False
+electromagnetic_theta_energy_plugin_name = "ThetaEnergyBinned"
 if the_args.thetaEnergyCalibPayload:
     with open(the_args.thetaEnergyCalibPayload, "r", encoding="utf-8") as f:
         theta_energy_payload = json.load(f)
     if not isinstance(theta_energy_payload, dict):
         raise RuntimeError("thetaEnergyCalibPayload must be a JSON object of DDMarlinPandora parameter keys.")
-    enabled_value = theta_energy_payload.get("ThetaEnergyCorrectionEnabled", [])
-    if enabled_value:
-        theta_energy_plugin_enabled = str(enabled_value[0]).strip().lower() in ("1", "true", "yes", "on")
-    plugin_value = theta_energy_payload.get("ThetaEnergyCorrectionPluginName", [])
-    if plugin_value:
-        theta_energy_plugin_name = str(plugin_value[0]).strip()
+
+    def payload_flag(name):
+        value = theta_energy_payload.get(name, [])
+        if not value:
+            return False
+        return str(value[0]).strip().lower() in ("1", "true", "yes", "on")
+
+    def payload_name(name, default):
+        value = theta_energy_payload.get(name, [])
+        if not value:
+            return default
+        return str(value[0]).strip()
+
+    hadronic_theta_energy_plugin_enabled = payload_flag("HadronicThetaEnergyCorrectionEnabled")
+    hadronic_theta_energy_plugin_name = payload_name(
+        "HadronicThetaEnergyCorrectionPluginName",
+        hadronic_theta_energy_plugin_name,
+    )
+
+    electromagnetic_theta_energy_plugin_enabled = payload_flag("ElectromagneticThetaEnergyCorrectionEnabled")
+    electromagnetic_theta_energy_plugin_name = payload_name(
+        "ElectromagneticThetaEnergyCorrectionPluginName",
+        electromagnetic_theta_energy_plugin_name,
+    )
+
+    if (not hadronic_theta_energy_plugin_enabled) and payload_flag("ThetaEnergyCorrectionEnabled"):
+        hadronic_theta_energy_plugin_enabled = True
+        hadronic_theta_energy_plugin_name = payload_name(
+            "ThetaEnergyCorrectionPluginName",
+            hadronic_theta_energy_plugin_name,
+        )
 
 # Patch hardcoded /code paths in Pandora settings XML to the runtime --code path.
 pandora_settings_xml = f"{the_args.code}/SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml"
@@ -118,62 +145,72 @@ if os.path.isfile(pandora_settings_xml):
         pandora_xml_text = f.read()
     code_prefix = f"{the_args.code.rstrip('/')}/"
     patched_xml_text = pandora_xml_text.replace("/code/", code_prefix)
-    if theta_energy_plugin_enabled and theta_energy_plugin_name:
-        def ensure_energy_plugin(xml_text, tag_name, plugin_name):
-            pattern = rf"(<{tag_name}>)([^<]*)(</{tag_name}>)"
-            match = re.search(pattern, xml_text)
-            if match:
-                plugin_tokens = [x for x in re.split(r"[,\s]+", match.group(2).strip()) if x]
-                if plugin_name not in plugin_tokens:
-                    plugin_tokens.append(plugin_name)
-                new_body = " ".join(plugin_tokens)
-                return re.sub(pattern, rf"\1{new_body}\3", xml_text, count=1), True
+    def ensure_energy_plugin(xml_text, tag_name, plugin_name):
+        pattern = rf"(<{tag_name}>)([^<]*)(</{tag_name}>)"
+        match = re.search(pattern, xml_text)
+        if match:
+            plugin_tokens = [x for x in re.split(r"[,\s]+", match.group(2).strip()) if x]
+            if plugin_name not in plugin_tokens:
+                plugin_tokens.append(plugin_name)
+            new_body = " ".join(plugin_tokens)
+            return re.sub(pattern, rf"\1{new_body}\3", xml_text, count=1), True
 
+        return xml_text, False
+
+    def insert_after_tag(xml_text, anchor_tag_name, new_tag_name, plugin_name):
+        anchor_line = re.search(
+            rf"([ \t]*<{anchor_tag_name}>[^<]*</{anchor_tag_name}>\n)",
+            xml_text,
+        )
+        if not anchor_line:
             return xml_text, False
 
+        indent = " " * (len(anchor_line.group(1)) - len(anchor_line.group(1).lstrip()))
+        insertion = (
+            f"{anchor_line.group(1)}"
+            f"{indent}<{new_tag_name}>{plugin_name}</{new_tag_name}>\n"
+        )
+        return (
+            xml_text[: anchor_line.start(1)] + insertion + xml_text[anchor_line.end(1):],
+            True,
+        )
+
+    if hadronic_theta_energy_plugin_enabled and hadronic_theta_energy_plugin_name:
         patched_xml_text, hadronic_found = ensure_energy_plugin(
             patched_xml_text,
             "HadronicEnergyCorrectionPlugins",
-            theta_energy_plugin_name,
+            hadronic_theta_energy_plugin_name,
         )
         if hadronic_found:
             print(
                 "Updated HadronicEnergyCorrectionPlugins in Pandora XML to include: "
-                f"{theta_energy_plugin_name}"
+                f"{hadronic_theta_energy_plugin_name}"
             )
         else:
             print("WARNING: Could not find <HadronicEnergyCorrectionPlugins> in Pandora settings XML.")
 
+    if electromagnetic_theta_energy_plugin_enabled and electromagnetic_theta_energy_plugin_name:
         patched_xml_text, electromagnetic_found = ensure_energy_plugin(
             patched_xml_text,
             "ElectromagneticEnergyCorrectionPlugins",
-            theta_energy_plugin_name,
+            electromagnetic_theta_energy_plugin_name,
         )
         if electromagnetic_found:
             print(
                 "Updated ElectromagneticEnergyCorrectionPlugins in Pandora XML to include: "
-                f"{theta_energy_plugin_name}"
+                f"{electromagnetic_theta_energy_plugin_name}"
             )
         else:
-            hadronic_line = re.search(
-                r"([ \t]*<HadronicEnergyCorrectionPlugins>[^<]*</HadronicEnergyCorrectionPlugins>\n)",
+            patched_xml_text, inserted = insert_after_tag(
                 patched_xml_text,
+                "HadronicEnergyCorrectionPlugins",
+                "ElectromagneticEnergyCorrectionPlugins",
+                electromagnetic_theta_energy_plugin_name,
             )
-            if hadronic_line:
-                insertion = (
-                    f"{hadronic_line.group(1)}"
-                    f"{' ' * (len(hadronic_line.group(1)) - len(hadronic_line.group(1).lstrip()))}"
-                    f"<ElectromagneticEnergyCorrectionPlugins>{theta_energy_plugin_name}"
-                    f"</ElectromagneticEnergyCorrectionPlugins>\n"
-                )
-                patched_xml_text = (
-                    patched_xml_text[: hadronic_line.start(1)]
-                    + insertion
-                    + patched_xml_text[hadronic_line.end(1):]
-                )
+            if inserted:
                 print(
                     "Inserted ElectromagneticEnergyCorrectionPlugins in Pandora XML to include: "
-                    f"{theta_energy_plugin_name}"
+                    f"{electromagnetic_theta_energy_plugin_name}"
                 )
             else:
                 print("WARNING: Could not insert <ElectromagneticEnergyCorrectionPlugins> in Pandora settings XML.")
@@ -1054,9 +1091,7 @@ DDMarlinPandora.Parameters = {
 }
 
 if the_args.writeClusterCalibrationComparison:
-    DDMarlinPandora.Parameters["ClusterCollectionName"] = ["PandoraClustersCalibrated"]
-    DDMarlinPandora.Parameters["UncalibratedClusterCollectionName"] = ["PandoraClusters"]
-    DDMarlinPandora.Parameters["ForceClusterEnergyComparisonToHadronic"] = ["true"]
+    DDMarlinPandora.Parameters["UncalibratedClusterCollectionName"] = ["PandoraClustersRaw"]
 
 if the_args.thetaEnergyCalibPayload:
     for key, value in theta_energy_payload.items():
