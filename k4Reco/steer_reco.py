@@ -53,32 +53,16 @@ else:
 
 if not the_args.disableAutoMyBIBUtilsDll:
     mybib_candidates = []
-    for lib in (
-        f"{the_args.code}/MyBIBUtils/lib/libMyBIBUtils.so",
-        f"{the_args.code}/MyBIBUtils/build/lib/libMyBIBUtils.so",
-        f"{the_args.code}/MyBIBUtils/lib64/libMyBIBUtils.so",
-        f"{the_args.code}/MyBIBUtils/build/lib64/libMyBIBUtils.so",
+    for pattern in (
+        f"{the_args.code}/MyBIBUtils/lib/*.so",
+        f"{the_args.code}/MyBIBUtils/build/lib/*.so",
+        f"{the_args.code}/MyBIBUtils/lib64/*.so",
+        f"{the_args.code}/MyBIBUtils/build/lib64/*.so",
     ):
-        if os.path.exists(lib):
-            mybib_candidates.append(lib)
-
-    if not mybib_candidates:
-        for pattern in (
-            f"{the_args.code}/MyBIBUtils/lib/libMyBIBUtils*.so",
-            f"{the_args.code}/MyBIBUtils/build/lib/libMyBIBUtils*.so",
-            f"{the_args.code}/MyBIBUtils/lib64/libMyBIBUtils*.so",
-            f"{the_args.code}/MyBIBUtils/build/lib64/libMyBIBUtils*.so",
-        ):
-            mybib_candidates.extend(glob.glob(pattern))
-        mybib_candidates = sorted(set(mybib_candidates))
-        if len(mybib_candidates) > 1:
-            print(
-                "WARNING: Multiple MyBIBUtils libs detected via wildcard fallback; "
-                "consider --disableAutoMyBIBUtilsDll with --extraMarlinDll."
-            )
-
-    if mybib_candidates:
-        marlin_dll_entries = list(mybib_candidates) + marlin_dll_entries
+        mybib_candidates.extend(glob.glob(pattern))
+    for lib in sorted(set(mybib_candidates)):
+        if lib not in marlin_dll_entries:
+            marlin_dll_entries.insert(0, lib)
 
 if the_args.extraMarlinDll:
     marlin_dll_entries = [x for x in the_args.extraMarlinDll.split(":") if x] + marlin_dll_entries
