@@ -8,6 +8,7 @@
 
     <!-- PLUGIN REGISTRATION -->
     <HadronicEnergyCorrectionPlugins>SoftwareCompensation</HadronicEnergyCorrectionPlugins>
+    <ElectromagneticEnergyCorrectionPlugins>PhotonEMNonLinearity</ElectromagneticEnergyCorrectionPlugins>
     <EmShowerPlugin>LCEmShowerId</EmShowerPlugin>
     <PhotonPlugin>LCPhotonId</PhotonPlugin>
     <ElectronPlugin>LCElectronId</ElectronPlugin>

@@ -5,7 +5,24 @@ from Configurables import LcioEvent, EventDataSvc, MarlinProcessorWrapper
 from k4MarlinWrapper.parseConstants import *
 
 import glob
+import json
 import os
+
+
+def load_ddmarlin_parameter_payload(path: str) -> dict:
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Expected dict payload in {path}")
+
+    normalized = {}
+    for key, values in payload.items():
+        if not isinstance(values, list):
+            raise RuntimeError(f"Expected list value for DDMarlin parameter '{key}' in {path}")
+        normalized[key] = [str(value) for value in values]
+
+    return normalized
 
 from k4FWCore.parseArgs import parser
 
@@ -22,6 +39,7 @@ parser.add_argument("--skipTrackerConing", action="store_true", default=False, h
 parser.add_argument("--inputFile", type=str, default="", help="Input file, if set ignores the automatic path lookup in `--data`")
 parser.add_argument("--outputFile", type=str, default="", help="Output file, if set ignores the automatic output path generation in `--data`")
 parser.add_argument("--useLocalThresholds", action="store_true", default=False, help="Read MyBIBUtils thresholds files from code directory, rather than from the container")
+parser.add_argument("--photonEMCalibPayload", type=str, default=None, help="JSON payload for Pandora EM theta-energy correction")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
@@ -72,9 +90,9 @@ if not the_args.enableBIB:
 else:
     Output_REC.Parameters = {
         "DropCollectionTypes": [
-            "SimTrackerHit", 
+            "SimTrackerHit",
             "SimCalorimeterHit",
-            "CalorimeterHit", 
+            "CalorimeterHit",
             "TrackerHitPlane",
             "LCRelation"
         ],
@@ -360,7 +378,7 @@ CKFTracking.Parameters = {
     #"SeedFinding_phiBottomBinLen": ["25"],
     #"SeedFinding_phiTopBinLen": ["50"],
     "SeedingLayers": ["13", "2", "13", "6", "13", "10", "13", "14",
-                      "14", "2", "14", "6", "14", "8", "14", "10", 
+                      "14", "2", "14", "6", "14", "8", "14", "10",
                       "15", "2", "15", "6", "15", "10", "15", "14",
                       "8", "2",
                       "17", "2",
@@ -772,7 +790,7 @@ DDMarlinPandora.Parameters = {
     "ECalToHadGeVCalibrationBarrel": ["1.24223718397"],
     "ECalToHadGeVCalibrationEndCap": ["1.24223718397"],
     "ECalToMipCalibration": ["181.818"],
-    "EMConstantTerm": ["0.01"], 
+    "EMConstantTerm": ["0.01"],
     "EMStochasticTerm": ["0.17"],
     "FinalEnergyDensityBin": ["110."],
     "HCalBarrelNormalVector": ["0", "0", "1"],
@@ -829,30 +847,30 @@ DDMarlinPandora.Parameters = {
     "SoftwareCompensationEnergyDensityBins": ["0", "2.", "5.", "7.5", "9.5", "13.", "16.", "20.", "23.5", "28.", "33.", "40.", "50.", "75.", "100."],
     "SoftwareCompensationWeights": ["1.61741", "-0.00444385", "2.29683e-05", "-0.0731236", "-0.00157099", "-7.09546e-07", "0.868443", "1.0561", "-0.0238574"],
     # ECAL corrections w/ BIB w/ cell selection
-    #"ECALInputEnergyCorrectionPoints": ["0.1", "11.894", "12.971", "13.166", "14.926", "15.26", "17.133", "20.106", "23.174", "25.777", 
-    #                                    "29.132", "32.219", "34.876", "36.577", "39.751", "42.48", "46.22", "49.708", "53.274", "56.89", 
-    #                                    "59.071", "62.913", "67.952", "75.322", "82.061", "89.277", "96.304", "116.911", "153.542", "189.536", 
-    #                                    "227.668", "267.495", "308.292", "348.397", "386.6", "428.067", "488.265", "571.82", "655.051", "741.878", 
-    #                                    "821.348", "913.81", "1000.185", "1089.007", "1169.009", "1415.481", "1859.895", "2315.64", "2941.297", "3851.56", 
+    #"ECALInputEnergyCorrectionPoints": ["0.1", "11.894", "12.971", "13.166", "14.926", "15.26", "17.133", "20.106", "23.174", "25.777",
+    #                                    "29.132", "32.219", "34.876", "36.577", "39.751", "42.48", "46.22", "49.708", "53.274", "56.89",
+    #                                    "59.071", "62.913", "67.952", "75.322", "82.061", "89.277", "96.304", "116.911", "153.542", "189.536",
+    #                                    "227.668", "267.495", "308.292", "348.397", "386.6", "428.067", "488.265", "571.82", "655.051", "741.878",
+    #                                    "821.348", "913.81", "1000.185", "1089.007", "1169.009", "1415.481", "1859.895", "2315.64", "2941.297", "3851.56",
     #                                    "4279.5"],
-    #"ECALOutputEnergyCorrectionPoints": ["0.1", "11.0", "13.0", "15.0", "17.0", "19.0", "22.5", "27.5", "32.5", "37.5", 
-    #                                     "42.5", "47.5", "52.5", "57.5", "62.5", "67.5", "72.5", "77.5", "82.5", "87.5", 
-    #                                     "92.5", "97.5", "105.0", "115.0", "125.0", "135.0", "145.0", "175.0", "225.0", "275.0", 
-    #                                     "325.0", "375.0", "425.0", "475.0", "525.0", "575.0", "650.0", "750.0", "850.0", "950.0", 
-    #                                     "1050.0", "1150.0", "1250.0", "1350.0", "1450.0", "1750.0", "2250.0", "2750.0", "3500.0", "4500.0", 
+    #"ECALOutputEnergyCorrectionPoints": ["0.1", "11.0", "13.0", "15.0", "17.0", "19.0", "22.5", "27.5", "32.5", "37.5",
+    #                                     "42.5", "47.5", "52.5", "57.5", "62.5", "67.5", "72.5", "77.5", "82.5", "87.5",
+    #                                     "92.5", "97.5", "105.0", "115.0", "125.0", "135.0", "145.0", "175.0", "225.0", "275.0",
+    #                                     "325.0", "375.0", "425.0", "475.0", "525.0", "575.0", "650.0", "750.0", "850.0", "950.0",
+    #                                     "1050.0", "1150.0", "1250.0", "1350.0", "1450.0", "1750.0", "2250.0", "2750.0", "3500.0", "4500.0",
     #                                     "5000."],
     # ECAL corrections w/o BIB w/cell selection
-    #"ECALInputEnergyCorrectionPoints": ["0.1", 
-    #                                    "35.871", "38.327", "41.386", "45.812", "50.01", "53.71", "58.548", "63.903", "66.884", "68.92", 
-    #                                    "75.776", "79.581", "85.142", "91.092", "97.439", "103.42", "108.42", "112.653", "121.198", "133.57", 
-    #                                    "142.56", "152.919", "163.913", "192.116", "242.636", "292.002", "342.592", "392.635", "446.347", 
-    #                                    "495.021", "544.526", "597.864", "671.43", "774.283", "874.801", "983.224", "1082.058", "1186.351", 
+    #"ECALInputEnergyCorrectionPoints": ["0.1",
+    #                                    "35.871", "38.327", "41.386", "45.812", "50.01", "53.71", "58.548", "63.903", "66.884", "68.92",
+    #                                    "75.776", "79.581", "85.142", "91.092", "97.439", "103.42", "108.42", "112.653", "121.198", "133.57",
+    #                                    "142.56", "152.919", "163.913", "192.116", "242.636", "292.002", "342.592", "392.635", "446.347",
+    #                                    "495.021", "544.526", "597.864", "671.43", "774.283", "874.801", "983.224", "1082.058", "1186.351",
     #                                    "1288.68", "1412.564", "1528.811", "1834.117", "2298.427", "2820.119", "3588.558", "4565.85", "5073.16"],
-    #"ECALOutputEnergyCorrectionPoints": ["0.1",  
-    #                                     "16.0", "18.5", "22.5", "27.5", "32.5", "37.5", "42.5", "47.5", "52.5", "57.5", "62.5", "67.5", 
-    #                                     "72.5", "77.5", "82.5", "87.5", "92.5", "97.5", "105.0", "115.0", "125.0", "135.0", "145.0", 
-    #                                     "175.0", "225.0", "275.0", "325.0", "375.0", "425.0", "475.0", "525.0", "575.0", "650.0", "750.0", 
-    #                                     "850.0", "950.0", "1050.0", "1150.0", "1250.0", "1350.0", "1450.0", "1750.0", "2250.0", "2750.0", 
+    #"ECALOutputEnergyCorrectionPoints": ["0.1",
+    #                                     "16.0", "18.5", "22.5", "27.5", "32.5", "37.5", "42.5", "47.5", "52.5", "57.5", "62.5", "67.5",
+    #                                     "72.5", "77.5", "82.5", "87.5", "92.5", "97.5", "105.0", "115.0", "125.0", "135.0", "145.0",
+    #                                     "175.0", "225.0", "275.0", "325.0", "375.0", "425.0", "475.0", "525.0", "575.0", "650.0", "750.0",
+    #                                     "850.0", "950.0", "1050.0", "1150.0", "1250.0", "1350.0", "1450.0", "1750.0", "2250.0", "2750.0",
     #                                     "3500.0", "4500.0", "5000."],
     "SplitVertexCollections": ["SplitVertices"],
     "StartVertexAlgorithmName": ["PandoraPFANew"],
@@ -874,6 +892,10 @@ DDMarlinPandora.Parameters = {
     "Z0UnmatchedVertexTrackCut": ["5"],
     "ZCutForNonVertexTracks": ["250"]
 }
+
+if the_args.photonEMCalibPayload:
+    DDMarlinPandora.Parameters.update(load_ddmarlin_parameter_payload(the_args.photonEMCalibPayload))
+    print(f"Loaded photon EM calibration payload: {the_args.photonEMCalibPayload}")
 
 FastJetProcessor = MarlinProcessorWrapper("FastJetProcessor")
 FastJetProcessor.OutputLevel = INFO
