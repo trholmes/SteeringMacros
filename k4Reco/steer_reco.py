@@ -1092,6 +1092,7 @@ DDMarlinPandora.Parameters = {
 }
 
 if the_args.writeClusterCalibrationComparison:
+    DDMarlinPandora.Parameters["CalibratedComparisonClusterCollectionName"] = ["PandoraClustersCalibrated"]
     DDMarlinPandora.Parameters["UncalibratedClusterCollectionName"] = ["PandoraClustersRaw"]
 
 if the_args.thetaEnergyCalibPayload:
