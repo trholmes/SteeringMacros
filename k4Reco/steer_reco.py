@@ -5,6 +5,9 @@ from Configurables import LcioEvent, EventDataSvc, MarlinProcessorWrapper
 from k4MarlinWrapper.parseConstants import *
 
 import os
+import json
+import re
+import tempfile
 
 from k4FWCore.parseArgs import parser
 
@@ -17,9 +20,87 @@ parser.add_argument("--data", type=str, default="/dataMuC", help="Top-level dire
 parser.add_argument("--compressionLevel", type=int, default=None, help="Set compression level of output")
 parser.add_argument("--skipReco", action="store_true", default=False, help="Skip reconstruction")
 parser.add_argument("--skipTrackerConing", action="store_true", default=False, help="Skip tracker coning")
+parser.add_argument("--thetaEnergyCalibPayload", type=str, default=None, help="JSON payload of DDMarlinPandora theta-energy correction parameters")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
+
+theta_energy_payload = None
+hadronic_theta_energy_plugin_enabled = False
+hadronic_theta_energy_plugin_name = "ThetaEnergyBinned"
+electromagnetic_theta_energy_plugin_enabled = False
+electromagnetic_theta_energy_plugin_name = "ThetaEnergyBinned"
+
+if the_args.thetaEnergyCalibPayload:
+    with open(the_args.thetaEnergyCalibPayload, "r", encoding="utf-8") as f:
+        theta_energy_payload = json.load(f)
+    if not isinstance(theta_energy_payload, dict):
+        raise RuntimeError("thetaEnergyCalibPayload must be a JSON object of DDMarlinPandora parameter keys.")
+
+    def payload_flag(name):
+        value = theta_energy_payload.get(name, [])
+        if not value:
+            return False
+        return str(value[0]).strip().lower() in ("1", "true", "yes", "on")
+
+    def payload_name(name, default):
+        value = theta_energy_payload.get(name, [])
+        if not value:
+            return default
+        return str(value[0]).strip()
+
+    hadronic_theta_energy_plugin_enabled = payload_flag("HadronicThetaEnergyCorrectionEnabled")
+    hadronic_theta_energy_plugin_name = payload_name("HadronicThetaEnergyCorrectionPluginName", hadronic_theta_energy_plugin_name)
+    electromagnetic_theta_energy_plugin_enabled = payload_flag("ElectromagneticThetaEnergyCorrectionEnabled")
+    electromagnetic_theta_energy_plugin_name = payload_name("ElectromagneticThetaEnergyCorrectionPluginName", electromagnetic_theta_energy_plugin_name)
+
+    if (not hadronic_theta_energy_plugin_enabled) and payload_flag("ThetaEnergyCorrectionEnabled"):
+        hadronic_theta_energy_plugin_enabled = True
+        hadronic_theta_energy_plugin_name = payload_name("ThetaEnergyCorrectionPluginName", hadronic_theta_energy_plugin_name)
+
+pandora_settings_xml = f"{the_args.code}/SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml"
+if os.path.isfile(pandora_settings_xml):
+    with open(pandora_settings_xml, "r", encoding="utf-8") as f:
+        pandora_xml_text = f.read()
+
+    patched_xml_text = pandora_xml_text.replace("/code/", f"{the_args.code.rstrip('/')}/")
+
+    def ensure_energy_plugin(xml_text, tag_name, plugin_name):
+        pattern = rf"(<{tag_name}>)([^<]*)(</{tag_name}>)"
+        match = re.search(pattern, xml_text)
+        if not match:
+            return xml_text, False
+        plugin_tokens = [x for x in re.split(r"[,\s]+", match.group(2).strip()) if x]
+        if plugin_name not in plugin_tokens:
+            plugin_tokens.append(plugin_name)
+        return re.sub(pattern, rf"\1{' '.join(plugin_tokens)}\3", xml_text, count=1), True
+
+    def insert_after_tag(xml_text, anchor_tag_name, new_tag_name, plugin_name):
+        anchor_line = re.search(rf"([ \t]*<{anchor_tag_name}>[^<]*</{anchor_tag_name}>\n)", xml_text)
+        if not anchor_line:
+            return xml_text, False
+        indent = " " * (len(anchor_line.group(1)) - len(anchor_line.group(1).lstrip()))
+        insertion = f"{anchor_line.group(1)}{indent}<{new_tag_name}>{plugin_name}</{new_tag_name}>\n"
+        return xml_text[:anchor_line.start(1)] + insertion + xml_text[anchor_line.end(1):], True
+
+    if hadronic_theta_energy_plugin_enabled:
+        patched_xml_text, _ = ensure_energy_plugin(patched_xml_text, "HadronicEnergyCorrectionPlugins", hadronic_theta_energy_plugin_name)
+
+    if electromagnetic_theta_energy_plugin_enabled:
+        patched_xml_text, found = ensure_energy_plugin(patched_xml_text, "ElectromagneticEnergyCorrectionPlugins", electromagnetic_theta_energy_plugin_name)
+        if not found:
+            patched_xml_text, _ = insert_after_tag(
+                patched_xml_text,
+                "HadronicEnergyCorrectionPlugins",
+                "ElectromagneticEnergyCorrectionPlugins",
+                electromagnetic_theta_energy_plugin_name,
+            )
+
+    if patched_xml_text != pandora_xml_text:
+        with tempfile.NamedTemporaryFile(mode="w", suffix="_PandoraSettingsPatched.xml", prefix="steer_reco_", delete=False) as tf:
+            tf.write(patched_xml_text)
+            pandora_settings_xml = tf.name
+        print(f"Using patched Pandora settings XML: {pandora_settings_xml}")
 
 algList = []
 evtsvc = EventDataSvc()
@@ -776,7 +857,7 @@ DDMarlinPandora.Parameters = {
     "NEventsToSkip": ["0"],
     "NOuterSamplingLayers": ["3"],
     "PFOCollectionName": ["PandoraPFOs"],
-    "PandoraSettingsXmlFile": [f"{the_args.code}/SteeringMacros/PandoraSettings/PandoraSettingsDefault.xml"],
+    "PandoraSettingsXmlFile": [pandora_settings_xml],
     "ProngVertexCollections": ["ProngVertices"],
     "ReachesECalBarrelTrackerOuterDistance": ["-100"],
     "ReachesECalBarrelTrackerZMaxDistance": ["-50"],
@@ -835,6 +916,13 @@ DDMarlinPandora.Parameters = {
     "Z0UnmatchedVertexTrackCut": ["5"],
     "ZCutForNonVertexTracks": ["250"]
 }
+
+if theta_energy_payload:
+    for key, value in theta_energy_payload.items():
+        if not isinstance(value, list):
+            raise RuntimeError(f"thetaEnergyCalibPayload value for '{key}' must be a list.")
+        DDMarlinPandora.Parameters[key] = [str(x) for x in value]
+    print(f"Loaded theta-energy calibration payload with {len(theta_energy_payload)} keys from {the_args.thetaEnergyCalibPayload}")
 
 FastJetProcessor = MarlinProcessorWrapper("FastJetProcessor")
 FastJetProcessor.OutputLevel = INFO
