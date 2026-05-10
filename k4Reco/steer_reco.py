@@ -40,6 +40,7 @@ parser.add_argument("--inputFile", type=str, default="", help="Input file, if se
 parser.add_argument("--outputFile", type=str, default="", help="Output file, if set ignores the automatic output path generation in `--data`")
 parser.add_argument("--useLocalThresholds", action="store_true", default=False, help="Read MyBIBUtils thresholds files from code directory, rather than from the container")
 parser.add_argument("--photonEMCalibPayload", type=str, default=None, help="JSON payload for Pandora EM theta-energy correction")
+parser.add_argument("--hadronicCalibPayload", type=str, default=None, help="JSON payload for Pandora HAD theta-energy correction")
 the_args = parser.parse_args()
 
 Coned = "" if the_args.skipTrackerConing else "Coned"
@@ -896,6 +897,9 @@ DDMarlinPandora.Parameters = {
 if the_args.photonEMCalibPayload:
     DDMarlinPandora.Parameters.update(load_ddmarlin_parameter_payload(the_args.photonEMCalibPayload))
     print(f"Loaded photon EM calibration payload: {the_args.photonEMCalibPayload}")
+if the_args.hadronicCalibPayload:
+    DDMarlinPandora.Parameters.update(load_ddmarlin_parameter_payload(the_args.hadronicCalibPayload))
+    print(f"Loaded hadronic calibration payload: {the_args.hadronicCalibPayload}")
 
 FastJetProcessor = MarlinProcessorWrapper("FastJetProcessor")
 FastJetProcessor.OutputLevel = INFO
