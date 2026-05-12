@@ -20,6 +20,11 @@
         <MuonRmsCut>15.625</MuonRmsCut>
     </LCMuonId>
 
+    <LCElectronId>
+        <!-- If true, the E/p check uses corrected electromagnetic cluster energy. -->
+        <UseCorrectedElectromagneticEnergyForEOverP>false</UseCorrectedElectromagneticEnergyForEOverP>
+    </LCElectronId>
+
     <!-- ALGORITHM SETTINGS -->
 
     <!-- Set calo hit properties, then select tracks and hits to use for clustering -->
