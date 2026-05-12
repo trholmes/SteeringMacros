@@ -114,6 +114,8 @@
                     <algorithm type = "TrackClusterAssociation"/>
                     <!-- Corresponds to an angle of 0.1 radians. Much smaller than default of 0.9 (~0.45 rad). -->
                     <ConeCosineHalfAngle>0.995</ConeCosineHalfAngle>
+                    <!-- If true, track-cluster chi checks use corrected parent and merged-candidate hadronic energies. -->
+                    <UseCorrectedHadronicEnergyForTrackComparison>false</UseCorrectedHadronicEnergyForTrackComparison>
                 </algorithm>
             </associationAlgorithms>
         </algorithm>
