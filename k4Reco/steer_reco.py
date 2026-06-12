@@ -160,7 +160,8 @@ VXDBarrelDigitiser.Parameters = {
     "TimeWindowMax": ["0.15"],
     "TimeWindowMin": ["-0.09"],
     "TrackerHitCollectionName": ["VBTrackerHits"],
-    "UseTimeWindow": ["true"]
+    "UseTimeWindow": ["true"],
+    "ForceHitsOntoSurface": ["true"]
 }
 
 VXDEndcapDigitiser = MarlinProcessorWrapper("VXDEndcapDigitiser")
@@ -178,7 +179,8 @@ VXDEndcapDigitiser.Parameters = {
     "TimeWindowMax": ["0.15"],
     "TimeWindowMin": ["-0.09"],
     "TrackerHitCollectionName": ["VETrackerHits"],
-    "UseTimeWindow": ["true"]
+    "UseTimeWindow": ["true"],
+    "ForceHitsOntoSurface": ["true"]
 }
 
 InnerPlanarDigiProcessor = MarlinProcessorWrapper("InnerPlanarDigiProcessor")
@@ -196,7 +198,8 @@ InnerPlanarDigiProcessor.Parameters = {
     "TimeWindowMax": ["0.3"],
     "TimeWindowMin": ["-0.18"],
     "TrackerHitCollectionName": ["IBTrackerHits"],
-    "UseTimeWindow": ["true"]
+    "UseTimeWindow": ["true"],
+    "ForceHitsOntoSurface": ["true"]
 }
 
 InnerEndcapPlanarDigiProcessor = MarlinProcessorWrapper(
@@ -215,7 +218,8 @@ InnerEndcapPlanarDigiProcessor.Parameters = {
     "TimeWindowMax": ["0.3"],
     "TimeWindowMin": ["-0.18"],
     "TrackerHitCollectionName": ["IETrackerHits"],
-    "UseTimeWindow": ["true"]
+    "UseTimeWindow": ["true"],
+    "ForceHitsOntoSurface": ["true"]
 }
 
 OuterPlanarDigiProcessor = MarlinProcessorWrapper("OuterPlanarDigiProcessor")
@@ -233,7 +237,8 @@ OuterPlanarDigiProcessor.Parameters = {
     "TimeWindowMax": ["0.3"],
     "TimeWindowMin": ["-0.18"],
     "TrackerHitCollectionName": ["OBTrackerHits"],
-    "UseTimeWindow": ["true"]
+    "UseTimeWindow": ["true"],
+    "ForceHitsOntoSurface": ["true"]
 }
 
 OuterEndcapPlanarDigiProcessor = MarlinProcessorWrapper(
@@ -252,7 +257,8 @@ OuterEndcapPlanarDigiProcessor.Parameters = {
     "TimeWindowMax": ["0.3"],
     "TimeWindowMin": ["-0.18"],
     "TrackerHitCollectionName": ["OETrackerHits"],
-    "UseTimeWindow": ["true"]
+    "UseTimeWindow": ["true"],
+    "ForceHitsOntoSurface": ["true"]
 }
 
 VXDBarrelConer = MarlinProcessorWrapper("VXDBarrelConer")
@@ -788,8 +794,8 @@ DDMarlinPandora.Parameters = {
     "ECalSiToHadGeVCalibrationEndCap": ["1"],
     "ECalSiToMipCalibration": ["1"],
     "ECalToEMGeVCalibration": ["1.02373335516"],
-    "ECalToHadGeVCalibrationBarrel": ["1.24223718397"],
-    "ECalToHadGeVCalibrationEndCap": ["1.24223718397"],
+    "ECalToHadGeVCalibrationBarrel": ["1.38"],
+    "ECalToHadGeVCalibrationEndCap": ["1.38"],
     "ECalToMipCalibration": ["181.818"],
     "EMConstantTerm": ["0.01"],
     "EMStochasticTerm": ["0.17"],
@@ -798,7 +804,7 @@ DDMarlinPandora.Parameters = {
     "HCalCaloHitCollections": ["HcalBarrelCollectionSel", "HcalEndcapCollectionSel"],
     "HCalMipThreshold": ["0.3"],
     "HCalToEMGeVCalibration": ["1.02373335516"],
-    "HCalToHadGeVCalibration": ["1.01799349172"],
+    "HCalToHadGeVCalibration": ["1.25"],
     "HCalToMipCalibration": ["40.8163"],
     "HadConstantTerm": ["0.03"],
     "HadStochasticTerm": ["0.6"],
