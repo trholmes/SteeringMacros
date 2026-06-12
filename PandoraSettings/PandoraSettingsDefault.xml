@@ -114,6 +114,8 @@
                 <algorithm type = "ShowerMipMerging2"/>
                 <algorithm type = "ProximityBasedMerging">
                     <algorithm type = "TrackClusterAssociation"/>
+                    <!-- If true, track-cluster chi checks use corrected parent and merged-candidate hadronic energies. -->
+                    <UseCorrectedHadronicEnergyForTrackComparison>false</UseCorrectedHadronicEnergyForTrackComparison>
                 </algorithm>
                 <algorithm type = "ConeBasedMerging">
                     <algorithm type = "TrackClusterAssociation"/>
